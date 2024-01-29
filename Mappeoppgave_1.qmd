@@ -1,0 +1,106 @@
+---
+title: "Mappeoppgave 1"
+output: TRUE
+---
+
+```{r}
+rm(list = ls())
+#laster in relevante pakker
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readr)
+```
+
+```{r}
+#laster in de relevante kollonnene og rekkene fra datasettene
+df_had <- read.csv("https://www.metoffice.gov.uk/hadobs/hadcrut5/data/HadCRUT.5.0.2.0/analysis/diagnostics/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.csv")
+
+df_gist <- read.csv("https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv",header = TRUE , skip = 1)
+
+df_noaa <- read.csv("https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/global/time-series/globe/land_ocean/12/12/1850-2023/data.csv",skip = 4)
+
+df_berkely <- read_table2("https://berkeley-earth-temperature.s3.us-west-1.amazonaws.com/Global/Land_and_Ocean_summary.txt",skip = 58, col_names = FALSE)[,1:2]
+
+
+```
+
+jeg begynner med å endre formaten til datasettene så de passer sammen.
+
+```{r}
+
+df_gist = select(df_gist, "Year","J.D")
+```
+
+```{r}
+df_berkely = df_berkely %>%
+  rename(Year = X1)
+```
+
+```{r}
+df_had <- df_had %>%
+  rename(Year = Time)
+```
+
+jeg lager et nytt datasett med dataen fra alle nedlastede datasett
+
+```{r}
+#lager datasett
+df <- df_had[1:2]
+
+#limer all relevanta data in i det nye datasettet
+df <- left_join(df, df_berkely, by=c("Year"))
+df <- left_join(df, df_gist, by=c("Year"))
+df <- left_join(df, df_noaa, by=c("Year"))
+
+
+
+
+```
+
+Så endrer jeg formaten til datasette så det blir letter å jobbe med.
+
+```{r}
+
+df <- df %>%
+  rename(year = Year,
+         hadcurt = Anomaly..deg.C. ,
+         berkely = X2,
+         gist = J.D,
+         noaa = Anomaly)
+```
+
+Nå som jeg har all dataen samlet og i rett format plotter jeg grafen.
+
+```{r}
+df %>%
+ggplot(aes(x=year)) + 
+  #plotter in vær datakilde
+  geom_line(aes(y = berkely ), color = "darkred") + 
+  geom_line(aes(y = hadcurt), color="green")+
+  geom_line(aes(y = gist), color="blue")+
+  geom_line(aes(y = noaa), color="orange")+
+  
+  #setter grenser til plotter og gir navn på aksene
+  coord_cartesian(ylim = c(-0.5,1.5),xlim = c(1850,2023))+
+  labs(y = "Temprature anomaly (°C)",x = "Year" )+
+  
+  
+  
+  
+  # skriver in titel og farget text
+  
+  ggtitle("Global surface temperature anomalies")+
+  
+  annotate(geom="text",x=1900, y=1.2,
+           label="BEST",color="red", size=6)+
+  annotate(geom="text",x=1907, y=1, 
+           label="hadCURT", color="green", size=6)+
+  annotate(geom="text",x=1899, y=0.8, 
+           label="GISS", color="blue", size=6)+
+  annotate(geom="text",x=1901, y=0.6, 
+           label="NOAA", color="orange", size=6)
+
+
+
+```
