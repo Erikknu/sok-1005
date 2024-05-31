@@ -1,0 +1,276 @@
+---
+title: "Prosjekt oppgave"
+format: pdf
+editor: visual
+echo: False
+---
+
+```{r,message=FALSE,warning=FALSE}
+rm(list = ls())
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readr)
+library(reticulate)
+
+```
+
+```{r}
+#laster in data
+df2 <- read.csv("C:/Users/Erik/Downloads/NSD3106-V1.csv")
+
+df1 <- read.csv("C:/Users/Erik/Downloads/NSD2995-V2.csv")
+
+```
+
+```{r}
+#setter opp datasettet med gjennomsnittlig økning
+avg <- aggregate(lonn~Tilfreds, df1, FUN=mean)
+
+avg <- rename(avg, lonn2021 = lonn)
+
+temp <- aggregate(lonn~Tilfreds, df2, FUN=mean)
+avg$lonn2022 <- temp$lonn
+
+#optimisme
+temp <- df1[c("Optim","Tilfreds")]
+temp <- filter(temp,Optim < 11)
+temp <- aggregate(Optim~Tilfreds, temp, FUN=mean)
+avg$optim2021 <- temp$Optim
+
+temp <- df2[c("Optim","Tilfreds")]
+temp <- filter(temp,Optim < 11)
+temp <- aggregate(Optim~Tilfreds, temp, FUN=mean)
+avg$optim2022 <- temp$Optim
+
+#Førnøy med helse
+temp <- df1[c("FornHelsF","Tilfreds")]
+temp <- filter(temp,FornHelsF < 11)
+temp <- aggregate(FornHelsF~Tilfreds, temp, FUN=mean)
+avg$FornHelsF2021 <- temp$FornHelsF
+
+temp <- df2[c("FornHelsF","Tilfreds")]
+temp <- filter(temp,FornHelsF < 11)
+temp <- aggregate(FornHelsF~Tilfreds, temp, FUN=mean)
+avg$FornHelsF2022 <- temp$FornHelsF
+
+#mestring
+mestr = c("Mestr1","Mestr2","Mestr3","Mestr6","Mestr7")
+temp <- df1[c("Tilfreds",mestr)]
+temp <- filter(temp,Mestr1 < 6 & Mestr2 < 6 & Mestr3 < 6 & Mestr6 < 6 & Mestr7< 6 )
+temp$mestringgj <- rowSums(temp[,c("Mestr1","Mestr2","Mestr3","Mestr6","Mestr7")])
+temp <- aggregate(mestringgj~Tilfreds, temp, FUN=mean)
+temp$mestringgj <- 30-temp$mestringgj 
+avg$mestringgj2021 <- temp$mestringgj*2/5
+
+
+temp <- df2[c("mestringgj","Tilfreds")]
+temp <- filter(temp,mestringgj < 6)
+temp <- aggregate(mestringgj~Tilfreds, temp, FUN=mean)
+avg$mestringgj2022 <- temp$mestringgj*2
+
+#arbeid privatsliv
+temp <- df1[c("ArbPriv","Tilfreds")]
+temp <- filter(temp,ArbPriv < 6)
+temp <- aggregate(ArbPriv~Tilfreds, temp, FUN=mean)
+avg$arbpriv2021 <- temp$ArbPriv*2
+
+
+
+
+
+
+
+avg <- filter(avg, Tilfreds < 11)
+
+
+#lønn percentile
+temp1 <- df1[c("Tilfreds","lonn")] %>%
+    mutate(intgrouped = ntile(lonn,10))
+
+
+temp <- temp1[c("intgrouped","Tilfreds")]
+temp <- filter(temp,Tilfreds < 11)
+temp <- aggregate(intgrouped~Tilfreds, temp, FUN=mean)
+avg$intgrouped2021 <- temp$intgrouped
+
+
+temp1 <- df2[c("Tilfreds","lonn")] %>%
+    mutate(intgrouped = ntile(lonn,10))
+
+
+temp <- temp1[c("intgrouped","Tilfreds")]
+temp <- filter(temp,Tilfreds < 11)
+temp <- aggregate(intgrouped~Tilfreds, temp, FUN=mean)
+avg$intgrouped2022 <- temp$intgrouped
+
+```
+
+```{r, message=FALSE,warning=FALSE,echo=FALSE}
+options(reticulate.repl.quiet = TRUE)
+#setter opp et pyton enviourment
+py_suppress_warnings(use_virtualenv("C:/Users/Erik/AppData/Local/Programs/Python/Python311/python.exe", required = 0))
+
+py_suppress_warnings(if (Sys.info()["machine"] == "x86-64") {
+  user_name <- Sys.info()["user"]
+  tcl_path <- paste0("C:/Users/Erik/AppData/Local/Programs/Python/Python311/tcl/tcl8.6")
+  Sys.setenv(TCL_LIBRARY = tcl_path)
+})
+
+#laster inn python pakker 
+py_suppress_warnings(py_install("matplotlib"))
+py_suppress_warnings(py_install("numpy"))
+
+
+#laster inn python script
+source_python("barplot.py")
+source_python("doublebarplot.py")
+source_python("stackedbar.py")
+```
+
+## Innledning
+
+Denne rapporten skal se på hvordan effekt økonomiske ulikheter har på livskvalitet og hvordan dette utviklet seg fra 2021 til 2022. For å gjøre dette vil vi se på forholdet mellom Hvor tilfredspersoner er og hvordan deres økonomiske tilstand er. I tillegg skal vi se på hvor stor faktor økonomisk tilstand er på livskvalitet i forhold til andre faktorer.
+
+### Økonomiens effekt på livskvalitet
+
+En åpenbar plass og starte er å ta for oss forholdet mellom lønn og hvor tilfreds en personer. Dette vil gi en ide om effekten av å tjene mer på hvor fornøyd personen er med livet sitt. Dette vises på figuren under i form av gjennomsnittlig lønn i vært nivå av tilfredshet.
+
+```{r}
+#bruker python funksjon til å plotte dataen 
+pythonbar(avg$Tilfreds,avg$lonn2021,"Gjennomsnittslønn per tilfredsnivå","2021","Tilfreds nivå","lønn","plot1")
+
+```
+
+![](%22plot1.png%22)
+
+Vi ser at det er en løs sammenheng mellom hvor tilfreds folk er og hvor mye de tjener. De som er mer tilfreds er generelt mer fornøyd. Sammenhengen er samtidig ikke lineær, dette kan vise til at det ikke er hele historien. Det kan blant annet være en korrelasjon ikke en årsakssammenheng eller det kan bare være en av flere faktorer.
+
+```{r}
+python2bar(avg$Tilfreds,avg$lonn2021,avg$lonn2022,"Gjennomsnittslønn per tilfreds nivå 2021 og 2022",
+           "2021","2022","Tilfreds nivå","lønn","plot2") 
+```
+
+![](plot2.png)
+
+Ovenfor ser vi for hvor mye lønn vært tilfredsnivå hadde i både 2021 og 2022. Vi kan se at det holdt seg relativt likt, men noen nivåer hadde store endringer. Under finner vi en graf som viser kun endringen fra 2021 til 2022 og er dermed lettere å analysere.
+
+```{r}
+pythonbar(avg$Tilfreds,avg$lonn2022-avg$lonn2021,"Endring i Gjennomsnittslønn","2021","Tilfredsnivå","lønn","plot3")
+```
+
+![](plot3.png)
+
+Vi ser at hvordan lønn henger sammen med tilfredsnivå har endret seg i nesten alle kategorier, noen mer enn andre. Den største endringen ser vi på på nivå 1, dette vil kunne bli forklart med at det er mye færre personer i de laveste nivåene. En konsekvens av dette er at det er større muligheter for store avvik i dataene. Av samme grunn er endringene vi ser i nivå 5-8 mye mer relevant for analyser siden de kategoriene har flesteparten av datapunktene. Når vi ser på figuren ovenfor igjen ser vi at det hopper opp fra nivå 5 til 6 og danner et åpenbart skille mellom nivåene under og over. Vi ser på denne figuren at nivå 5 gikk relativt kraftig ned mens 6 gikk opp, dette forårsaker at skille i lønn mellom de lavest og høyeste tilfredsnivåene blir større. Hvis man skal sette i gang potensielle tiltak for å øke livskvalitet i samfunnet kan dette være en problemstilling å sikte seg in på.
+
+### Lønn som en faktor
+
+Faktorer kan være at lønn bare er en av faktorene. Dette kam gi en løs sammenheng mellom lønn og tilfredshet. det vil i praksis bety at livskvalitet er bygget på flere faktorer, f.eks arbeids og privatsliv kombinasjon, helse, thing nr 3. disse henger åpenbart sammen til et visst nivå, sammtidig er de alle del av hva som gir livskvalitet. for å se hvordan effekt lønn har i forhold til disse faktorene kan vi bruke denne figuren.
+
+```{r}
+
+#lager et nytt datasett for faktorer 
+ratiodf2021 <- avg["Tilfreds"]
+
+
+#summerer verdiene fra alle faktorene 
+ratiodf2021$combined <- avg$mestringgj2021+avg$FornHelsF2021+avg$intgrouped2021
+#finner faktorenes % andel av totalen
+ratiodf2021$mestringrat <- avg$mestringgj2021/ratiodf2021$combined*100
+ratiodf2021$helsrat <- avg$FornHelsF2021/ratiodf2021$combined*100
+ratiodf2021$intrat <- avg$intgrouped2021/ratiodf2021$combined*100
+```
+
+```{r}
+stackedbar(ratiodf2021$Tilfreds,ratiodf2021$mestringrat,
+           ratiodf2021$helsrat,ratiodf2021$intrat,
+           "Tilfredsnivå delt i faktorer, 2021", "mestring","helse"
+           ,"lønn","Tilfreds nivå ","% av kombinerte faktorer","plot5")
+```
+
+![](plot5.png)
+
+Denne figuren tar ikke i betraktning alle mulige faktorer, men har valgt ut noen få får å bruke som et eksempel. Dette kan være problematisk, men det som er mest interessant er å se utviklingen til lønns faktoren i de forskjellige nivåene. Med tanke på det vil figuren fungere relativt godt for å analysere effekten lønn har på livskvalitet. Det vi kan se med en gang er at jo mer tilfreds personen er generelt jo mindre betyr lønn for hvor tilfreds de er. En mulighet for hvorfor dette er kan være at de som er mer tilfreds har generelt mer penger og dermed har de et mindre stress angående deres personlige økonomi.
+
+```{r}
+
+#setter opp et datasett for faktorenes % andel for 2022
+ratiodf2022 <- avg["Tilfreds"]
+
+
+
+ratiodf2022$combined <- avg$mestringgj2022+avg$FornHelsF2022+avg$intgrouped2022
+
+ratiodf2022$mestringrat <- avg$mestringgj2022/ratiodf2022$combined*100
+#ratiodf2022$arbprivrat <- avg$arbpriv2022/ratiodf2022$combined*100
+ratiodf2022$helsrat <- avg$FornHelsF2022/ratiodf2022$combined*100
+ratiodf2022$intrat <- avg$intgrouped2022/ratiodf2022$combined*100
+```
+
+```{r}
+stackedbar(ratiodf2022$Tilfreds,ratiodf2022$mestringrat,
+           ratiodf2022$helsrat,ratiodf2022$intrat,
+           "Tilfreds nivå delt i faktorer, 2022", "mestring","helse"
+           ,"lønn","Tilfreds nivå ","% av kombinerte faktorer","plot6")
+```
+
+![](plot6.png)
+
+Figuren for 2022 ser generelt lik ut med noen endringer, siden vi har fokus på økonomisk velstand i denne analysen skal vi fokusere på det. grafene ser relativt like ut med noen forskjeller. Vi kan se nærmer på forskjellene i en graf som isolerer kun lønn faktoren, denne finner vi under.
+
+```{r}
+python2bar(avg$Tilfreds,ratiodf2021$intrat,ratiodf2022$intrat,"Lønn som faktor av livskvalitet","2021","2022","Tilfreds nivå","Faktor størrelse","plot7")
+```
+
+![](plot7.png)
+
+Figuren viser prosentandelen lønn utgjør for hver av tilfredsnivåene. Det vi kan se er at lønn blir en mindre og mindre andel av faktorene desto mer tilfredsstilt person, dette stemmer både for 2021 og 2022. Sammen med at folk har generell høyere lønn desto mer tilfredsstilt de er kan indikere at jo mer man tjener jo mindre viktig blir det hvor mye man tjener. Når det kommer til endringen fra 2021 til 2022 ser vi at lønn ble en større faktor for de mest glade og dermed de som tjener mest i 2022. På andre siden ser vi at for de som er minst tilfreds og dermed de som tjener minst er lønn blitt en mindre faktor.
+
+```{r}
+
+#finner totale antall personer for vært tilfreds nivå 
+temp <- df1["Tilfreds"]
+temp <- filter(temp,Tilfreds < 11)
+avg$count2021 <- table(temp$Tilfreds)
+temp1 <- df2["Tilfreds"]
+temp1 <- filter(temp1,Tilfreds < 11)
+avg$count2022 <- table(temp1$Tilfreds)
+```
+
+```{r}
+
+#finner totale antall datapunkter
+countsum2021 <- sum(avg$count2021)
+countsum2022 <- sum(avg$count2022)
+
+#finner % andelen datapunkter i for vært nivå
+avg$tilfredsprc2021 <- avg$count2021/countsum2021*100 
+
+avg$tilfredsprc2022 <- avg$count2022/countsum2022*100 
+
+#finner endringen i andel fra 2021 til 2022
+avg$prcchange <- avg$tilfredsprc2021-avg$tilfredsprc2022
+```
+
+```{r}
+pythonbar(avg$Tilfreds,avg$prcchange,"Endring i Tilfredsnivå fra 2021 til 2022","","Tilfreds nivå","Prosentvis endring","plot8")
+
+temp <- df1["Tilfreds"] 
+temp<- filter(temp,Tilfreds < 11)
+mean2021 <- mean(temp$Tilfreds)
+
+temp <- df2["Tilfreds"] 
+temp<- filter(temp,Tilfreds < 11)
+mean2022 <- mean(temp$Tilfreds)
+
+```
+
+![](plot8.png)
+
+### Endring i tilfredsnivå
+
+Til slutt ser vi på den prosentvise endringen i alle tilfredsnivåene. Vi kan se at en større andel befolkningen finner seg i nivå 1-3 og 5-7, mens det er mindre i kategoriene 3-4 og 8-10. Dette kan indikere at den gjennomsnittlige livskvaliteten har gått ned. Men når vi ser på de gjennomsnittlige tilfredsnivåene i 2021 og 2022 ser vi at de gikk fra 6,76 til 6,86.I kombinasjon med grafen viser dette at flesteparten av datapunktene som gikk fra nivå 3-4 og 8-10 endte opp nærmer midten. Noe som gir mening når vi ser at den største positive endringen fins i nivå 5-6. Selv om dette kan bli sett på som en god ting at gjennomsnittlig tilfredsnivå har blitt høyere kan det være ugunstig at dette kom på størst bekostning av de mest tilfredse.
+
+## Konklusjon
+
+først har vi funnet en sammenheng mellom hvor tilfreds en person er å hvor mye personen tjener. i tillegg fant vi et hopp i lønn fra de som befant seg i nivå 5 og under til de som befant seg i 6 og over, dette skille ble større fra 2021 til 2022. et slik skille kan være ugunstig for flere grunner og vil være problematisk hvis man prøver å gjevne ut livskvaliteten på et samfunn. når vi så på lønn som en faktor for livskvalitet så vi at det ble mindre å mindre viktig for personen jo mer tilfreds og dermed jo høyere lønn personen hadde. lønn som en faktor ble mindre viktig for de minst tilfreds og mer viktig for de mest tilfreds fra 2021 til 2022. Det er en indikasjon på at lønn som en faktor av livskvalitet blir mer jevn over alle økonomiske grupper og nivåer. til slutt så vi på om hvordan Tilfredsel utviklet seg, grafen viste oss at det ble færre i de mest tilfreds nivåene mens 5-6 fikk en økning. sammtidig gikk de gjennomsnittlige tilfredsnivåene i befolkningen gikk fra 6.76 til 6.86. altså gjennomsnitts personen fikk høyere livskvalitet men på bekostning av de mest tilfreds og de som tjener mest. Dette vil passe sammen med at lønn som en faktor av livskvalitet også ble jevnere. -
